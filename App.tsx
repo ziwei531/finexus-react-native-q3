@@ -5,8 +5,9 @@
  * @format
  */
 
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import type {PropsWithChildren} from 'react';
+
 import {
   SafeAreaView,
   ScrollView,
@@ -18,6 +19,8 @@ import {
   Alert,
   useColorScheme,
   View,
+  AppState,
+  InteractionManager,
 } from 'react-native';
 
 import {
@@ -38,6 +41,7 @@ const App = (): JSX.Element => {
   const [largestItem, setLargestItem] = useState(0); //when user clicks remove, this should still remain the same, not go back to zero
 
   const [colorItems, setColorItems] = useState<string[]>([]);
+  const [timer, setTimer] = useState<NodeJS.Timeout | null>(null); // note to self. track the timer with react's useState to avoid issues.
 
   const color = [
     'lightseagreen',
@@ -52,6 +56,27 @@ const App = (): JSX.Element => {
     'darksalmon',
   ];
 
+  //timer for 15 seconds.
+  const countdownToRemoveAll = () => {
+    if (colorItems.length === 0) {
+      return;
+    }
+
+    if (timer) {
+      clearTimeout(timer);
+    }
+
+    const newTimer = setTimeout(() => {
+      removeAllColors();
+    }, 15000); // 15 seconds
+    setTimer(newTimer);
+  };
+
+  // useEffect(() => {
+  //   countdownToRemoveAll();
+  // }, []);
+
+  // reset timer if colorRemove has not been pressed for 15 seconds
   const randomColorAdd = () => {
     const randomColor = color[Math.floor(Math.random() * color.length)];
 
@@ -62,8 +87,10 @@ const App = (): JSX.Element => {
     }
 
     setColorItems([...colorItems, randomColor]);
+    countdownToRemoveAll();
   };
 
+  // reset timer if colorRemove has not been pressed for 15 seconds
   const colorRemove = () => {
     if (colorItems.length === 0) {
       Alert.alert('No items to remove', 'Please add items first', [
@@ -73,19 +100,88 @@ const App = (): JSX.Element => {
           style: 'cancel',
         },
       ]);
+      return;
     }
-    // colorItems.pop();
-    // setColorItems([...colorItems]);
 
-    const updatedColorItems = colorItems.slice(0, -1); // Create a new array without the last element
+    const updatedColorItems = colorItems.slice(0, -1); // create a new array without the last element
     setColorItems(updatedColorItems);
-
     setCurrent(current - 1);
+    countdownToRemoveAll();
   };
 
+  const removeAllColors = () => {
+    setColorItems([]);
+    setCurrent(0);
+  };
+
+  const alertColorSelected = (color: string) => {
+    clearTimeout(timer as NodeJS.Timeout);
+    Alert.alert('Color Selected', `This is ${color}`, [
+      {
+        text: 'OK',
+        onPress: () => console.log('OK Pressed'),
+        style: 'cancel',
+      },
+    ]);
+    countdownToRemoveAll();
+  };
+
+  // the individual list of colors that are to be rendered
   const renderItem = ({item}: {item: string}) => (
-    <View style={{backgroundColor: item, padding: 10}}>
+    <TouchableOpacity
+      onPress={alertColorSelected.bind(this, item)}
+      style={{
+        backgroundColor: item,
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
       <Text>{item}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderBottomView = () => (
+    <View
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}>
+      <View
+        style={{
+          backgroundColor: 'white',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+        <Text style={styles.itemText}>Current: {current} item</Text>
+        <Text style={styles.itemText}>Largest: {largestItem} item</Text>
+        <TouchableOpacity
+          onPress={colorRemove}
+          style={{
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#ffb3b3',
+            width: '50%',
+            height: 100,
+          }}>
+          <Text style={styles.removeAddText}>Remove</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={randomColorAdd}
+          style={{
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'green',
+            width: '50%',
+            height: 100,
+          }}>
+          <Text style={styles.removeAddText}>Push</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -99,51 +195,20 @@ const App = (): JSX.Element => {
           ...styles.container,
           backgroundColor: '#f2f2f2',
         }}>
-        {/* top view */}
-        <View>
-          {/* use flatList */}
+        {/* using flatList */}
+        <View style={{height: 700}}>
           <FlatList
             data={colorItems}
             renderItem={renderItem}
             keyExtractor={(item, index) => index.toString()}
+
+            // ListFooterComponentStyle={{flex: 1}}
+            // ListFooterComponent={renderBottomView}
           />
         </View>
+        {renderBottomView()}
 
         {/* bottom view */}
-        <View
-          style={{
-            backgroundColor: 'white',
-            paddingTop: 10,
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-          }}>
-          <Text style={styles.itemText}>Current: {current} item</Text>
-          <Text style={styles.itemText}>Largest: {largestItem} item</Text>
-          <TouchableOpacity
-            onPress={colorRemove}
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#ffb3b3',
-              width: '50%',
-              height: 100,
-            }}>
-            <Text style={styles.removeText}>Remove</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={randomColorAdd}
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: 'green',
-              width: '50%',
-              height: 100,
-            }}>
-            <Text style={styles.removeText}>Push</Text>
-          </TouchableOpacity>
-          {/* <View style={{backgroundColor: 'red', padding: 10}}></View> */}
-        </View>
       </SafeAreaView>
     </SafeAreaView>
   );
@@ -156,9 +221,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-  removeText: {
+  removeAddText: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
     fontStyle: 'italic',
@@ -166,7 +231,7 @@ const styles = StyleSheet.create({
 
   itemText: {
     color: 'black',
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: 'bold',
     textAlign: 'center',
     padding: 15,
